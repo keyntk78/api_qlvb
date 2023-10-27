@@ -44,6 +44,9 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness.QuanLySo
             int skip = ((paramModel.StartIndex - 1) * paramModel.PageSize) + paramModel.PageSize;
             string pagination = paramModel.PageSize < 0 ? $@"hocSinhs: '$hocSinhs'" : $@"hocSinhs: {{ $slice: ['$hocSinhs', {skip}, {paramModel.PageSize}] }},";
             var cauHinh = _mongoDatabase.GetCollection<TruongModel>(_collectionNameTruong).Find(x => x.Id == truong.IdCha).FirstOrDefault().CauHinh;
+            var collectionNamThi = _mongoDatabase.GetCollection<NamThiModel>(_collectionNameNamThi);
+
+            var khoaThi = collectionNamThi.Find(x => x.Id == dmtn.IdNamThi).FirstOrDefault().KhoaThis.Where(x => x.Id == paramModel.IdKhoaThi).FirstOrDefault();
 
             var cmdRes = $@"
                         {{
@@ -137,13 +140,15 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness.QuanLySo
             var truongJson = JsonConvert.SerializeObject(truong);
             var dmtnJson = JsonConvert.SerializeObject(dmtn);
             var cauHinhJson = JsonConvert.SerializeObject(cauHinh);
+            var khoaThiJson = JsonConvert.SerializeObject(khoaThi);
+
 
             if (soCapBangJson == null)
             {
                 return null;
             }
 
-            string finalJson = $"{{\"Truong\": {truongJson}, \"DanhMucTotNghiep\": {dmtnJson},\"CauHinh\": {cauHinhJson} ,\"SoCapPhatBang\": {soCapBangJson}}}";
+            string finalJson = $"{{\"Truong\": {truongJson}, \"DanhMucTotNghiep\": {dmtnJson},\"CauHinh\": {cauHinhJson},  \"KhoaThi\": {khoaThiJson} ,\"SoCapPhatBang\": {soCapBangJson}}}";
 
 
             return finalJson;

@@ -24,6 +24,8 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.QuanLySo
     {
         private SoCapBanSaoCL _cacheLayer;
         private TruongCL _truongCL;
+        private NamThiCL _namThiCL;
+
         private DanhMucTotNghiepCL _danhMucTotNghiepCL;
 
         private ILogger<SoCapBanSaoController> _logger;
@@ -36,6 +38,8 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.QuanLySo
             _cacheLayer = new SoCapBanSaoCL(cacheService, configuration);
             _truongCL = new TruongCL(cacheService, configuration);
             _danhMucTotNghiepCL = new DanhMucTotNghiepCL(cacheService, configuration);
+            _namThiCL = new NamThiCL(cacheService, configuration);
+
             _logger = logger;
             _localizer = shareResource;
             _mapper = mapper;
@@ -74,14 +78,18 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.QuanLySo
             //var user = _sysUserCL.GetByUsername(model.NguoiThucHien);
             //var donVi = _truongCL.GetById(user.TruongID);
             var truong = _truongCL.GetById(model.IdTruong);
+
             var cauHinhDonViQuanLy = _truongCL.GetById(truong.IdCha).CauHinh;
             var dmtn = _danhMucTotNghiepCL.GetById(model.IdDanhMucTotNghiep);
+            var khoaThi = _namThiCL.GetKhoaThiById(dmtn.IdNamThi, model.IdKhoaThi);
             var data = _cacheLayer.GetHocSinhCapBanSao(out total, model);
             var outputData = new
             {
                 DonViQuanLy = cauHinhDonViQuanLy,
                 Truong = truong,
+                NamThi = truong,
                 DanhMucTotNghiep = dmtn,
+                KhoaThi = khoaThi,
                 DonYeuCaus = data,
                 totalRow = total,
                 searchParam = model
