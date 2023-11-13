@@ -241,6 +241,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness.QuanLySo
                 !string.IsNullOrEmpty(modelSearch.Ma)
                     ? filterBuilder.Eq("Ma", modelSearch.Ma)
                     : null,
+    
                 modelSearch.TrangThai == null ? filterBuilder.In("TrangThai", new List<TrangThaiDonYeuCauEnum>
                 {
                         TrangThaiDonYeuCauEnum.DaDuyet,
@@ -319,6 +320,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness.QuanLySo
             var combinedFilter = filterBuilder.And(filters);
             var donYeuCaus = colectionDonYeuCauCapBanSao
                                 .Find(combinedFilter)
+                                
                                 .ToList();
 
             var donYeuCauVM = donYeuCaus.Join(
@@ -340,6 +342,23 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness.QuanLySo
                               return d;
                           }
                       ).ToList();
+
+            if(!string.IsNullOrEmpty(modelSearch.SoDienThoaiNguoiYeuCau))
+            {
+                donYeuCauVM = donYeuCauVM
+                                .Where(x => x.ThongTinNguoiYeuCau.SoDienThoaiNguoiYeuCau == modelSearch.SoDienThoaiNguoiYeuCau)
+                                .ToList();
+            }
+
+
+            if (modelSearch.NgayDuyet != null)
+            {
+                donYeuCauVM = donYeuCauVM.Where(x =>
+                               (x.NgayDuyet?.Date == modelSearch.NgayDuyet?.ToUniversalTime().Date ||
+                               x.NgayDuyet?.Date == modelSearch.NgayDuyet?.Date))
+                               .ToList();
+            }
+       
 
             if (!string.IsNullOrEmpty(modelSearch.HoTen))
             {
