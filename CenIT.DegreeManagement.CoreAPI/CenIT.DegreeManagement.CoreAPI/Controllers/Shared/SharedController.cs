@@ -1,4 +1,5 @@
 ﻿using AutoMapper;
+using CenIT.DegreeManagement.CoreAPI.Bussiness.Sys;
 using CenIT.DegreeManagement.CoreAPI.Caching.DanhMuc;
 using CenIT.DegreeManagement.CoreAPI.Caching.DuLieuHocSinh;
 using CenIT.DegreeManagement.CoreAPI.Caching.Phoi;
@@ -6,6 +7,7 @@ using CenIT.DegreeManagement.CoreAPI.Caching.Sys;
 using CenIT.DegreeManagement.CoreAPI.Core.Caching;
 using CenIT.DegreeManagement.CoreAPI.Core.Enums;
 using CenIT.DegreeManagement.CoreAPI.Core.Helpers;
+using CenIT.DegreeManagement.CoreAPI.Core.Models;
 using CenIT.DegreeManagement.CoreAPI.Core.Utils;
 using CenIT.DegreeManagement.CoreAPI.Models.DuLieuHocSinh;
 using CenIT.DegreeManagement.CoreAPI.Models.Shared;
@@ -31,6 +33,8 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.Shared
         private DanTocCL _danTocCL;
         private NamThiCL _namThiCL;
         private PhoiGocCL _phoiGocCL;
+        private SysFunctionCL _sysFunctionCL;
+
 
 
         private ILogger<SharedController> _logger;
@@ -41,6 +45,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.Shared
         {
             _sysConfigCL = new SysConfigCL(cacheService);
             _sysUserCL = new SysUserCL(cacheService);
+            _sysFunctionCL = new SysFunctionCL(cacheService);
             _danhMucTotNghiepCL = new DanhMucTotNghiepCL(cacheService , configuration);
             _truongCL = new TruongCL(cacheService, configuration);
             _heDaoTaoCL = new HeDaoTaoCL(cacheService, configuration);
@@ -219,5 +224,22 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.Shared
        
             return ResponseHelper.Ok(danhMucTotNghieps);
         }
+
+        /// <summary>
+        /// Lấy đanh sách chức năng
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet("GetAllFunction")]
+        [AllowAnonymous]
+        public IActionResult GetAllFunction()
+        {
+            var searchModel = new SearchParamModel() { PageSize = -1 };
+            var function = _sysFunctionCL.GetAll(searchModel);
+       
+            return ResponseHelper.Ok(function);
+        }
+
     }
+
+  
 }

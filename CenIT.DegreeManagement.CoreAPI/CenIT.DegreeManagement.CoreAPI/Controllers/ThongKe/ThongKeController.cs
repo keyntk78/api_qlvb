@@ -1,4 +1,6 @@
 ﻿using CenIT.DegreeManagement.CoreAPI.Caching;
+using CenIT.DegreeManagement.CoreAPI.Caching.DanhMuc;
+using CenIT.DegreeManagement.CoreAPI.Caching.Sys;
 using CenIT.DegreeManagement.CoreAPI.Core.Caching;
 using CenIT.DegreeManagement.CoreAPI.Core.Helpers;
 using CenIT.DegreeManagement.CoreAPI.Model.Models.Input.Search;
@@ -15,12 +17,16 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.ThongKe
         private ThongKeCL _thongKeCL;
         private ILogger<ThongKeController> _logger;
         private readonly ShareResource _localizer;
-
+        private TruongCL _truongCL;
+        private SysUserCL _sysUserCL;
         public ThongKeController(ICacheService cacheService, IConfiguration configuration, ShareResource shareResource, ILogger<ThongKeController> logger) : base(cacheService, configuration)
         {
             _logger = logger;
             _localizer = shareResource;
             _thongKeCL = new ThongKeCL(cacheService, configuration);
+            _sysUserCL = new SysUserCL(cacheService);
+            _truongCL = new TruongCL(cacheService, configuration);
+
         }
 
         #region PHÒNG
@@ -54,12 +60,15 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.ThongKe
         /// </summary>
         ///  <param name="modelSearch"></param>
         /// <returns></returns>
-
         [HttpGet("GetThongKeInPhoiBang")]
         [AllowAnonymous]
         public IActionResult GetThongKeInPhoiBang([FromQuery] ThongKeInPhoiBangSearchModel modelSearch)
         {
             int total;
+            var user = _sysUserCL.GetByUsername(modelSearch.NguoiThucHien);
+            var donVi = _truongCL.GetById(user.TruongID);
+            modelSearch.MaHeDaoTao = donVi.MaHeDaoTao;
+
             var data = _thongKeCL.GetThongKeInPhoiBang(out total, modelSearch);
 
             var outputData = new
@@ -82,7 +91,12 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.ThongKe
         public IActionResult GetThongKePhatBang([FromQuery] ThongKePhatBangSearchModel modelSearch)
         {
             int total;
-            var data = _thongKeCL.GetThongKePhatBang(out total, modelSearch);
+          
+            var user = _sysUserCL.GetByUsername(modelSearch.NguoiThucHien);
+            var donVi = _truongCL.GetById(user.TruongID);
+            modelSearch.MaHeDaoTao = donVi.MaHeDaoTao;
+
+            var data = _thongKeCL.GetThongKePhatBang(out total, modelSearch, donVi.Id);
 
             var outputData = new
             {
@@ -103,6 +117,9 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.ThongKe
         public IActionResult GetHocSinhDoTotNghiep([FromQuery] HocSinhTotNghiepSearchModel modelSearch)
         {
             int total;
+            var user = _sysUserCL.GetByUsername(modelSearch.NguoiThucHien);
+            var donVi = _truongCL.GetById(user.TruongID);
+            modelSearch.MaHeDaoTao = donVi.MaHeDaoTao;
             var data = _thongKeCL.GetHocSinhDoTotNghiep(out total, modelSearch);
 
             var outputData = new

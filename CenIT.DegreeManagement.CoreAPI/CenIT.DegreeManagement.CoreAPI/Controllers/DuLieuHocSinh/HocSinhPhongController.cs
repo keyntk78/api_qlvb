@@ -455,8 +455,8 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
                     hocSinh.TrangThai = TrangThaiHocSinhEnum.ChoDuyet;
                     hocSinh.KetQuaHocTaps = new List<KetQuaHocTapModel>
                     {
-                        new KetQuaHocTapModel { MaMon = hocSinh.Mon1, Diem = hocSinh.DiemMon1 ?? 0 },
-                        new KetQuaHocTapModel { MaMon = hocSinh.Mon2, Diem = hocSinh.DiemMon2 ?? 0 },
+                        new KetQuaHocTapModel { MaMon = hocSinh.MonNV, Diem = hocSinh.DiemNV ?? 0 },
+                        new KetQuaHocTapModel { MaMon = hocSinh.MonTO, Diem = hocSinh.DiemTO ?? 0 },
                         new KetQuaHocTapModel { MaMon = hocSinh.Mon3, Diem = hocSinh.DiemMon3 ?? 0 },
                         new KetQuaHocTapModel { MaMon = hocSinh.Mon4, Diem = hocSinh.DiemMon4 ?? 0 },
                         new KetQuaHocTapModel { MaMon = hocSinh.Mon5, Diem = hocSinh.DiemMon5 ?? 0 },

@@ -1,31 +1,31 @@
 ﻿using AutoMapper;
 using CenIT.DegreeManagement.CoreAPI.Caching.DanhMuc;
 using CenIT.DegreeManagement.CoreAPI.Caching.DuLieuHocSinh;
-using CenIT.DegreeManagement.CoreAPI.Caching.Phoi;
 using CenIT.DegreeManagement.CoreAPI.Caching.Sys;
 using CenIT.DegreeManagement.CoreAPI.Core.Caching;
 using CenIT.DegreeManagement.CoreAPI.Core.Enums;
+using CenIT.DegreeManagement.CoreAPI.Core.Enums.CauHinh;
 using CenIT.DegreeManagement.CoreAPI.Core.Helpers;
 using CenIT.DegreeManagement.CoreAPI.Core.Provider;
 using CenIT.DegreeManagement.CoreAPI.Core.Utils;
-using CenIT.DegreeManagement.CoreAPI.Hubs;
 using CenIT.DegreeManagement.CoreAPI.Model.Models.Input.DuLieuHocSinh;
 using CenIT.DegreeManagement.CoreAPI.Model.Models.Input.Sys;
 using CenIT.DegreeManagement.CoreAPI.Model.Models.Output.DuLieuHocSinh;
-using CenIT.DegreeManagement.CoreAPI.Model.Models.Output.Notification;
 using CenIT.DegreeManagement.CoreAPI.Processor;
+using CenIT.DegreeManagement.CoreAPI.Processor.ExcelProcess;
 using CenIT.DegreeManagement.CoreAPI.Processor.SendNotification;
+using CenIT.DegreeManagement.CoreAPI.Processor.UploadFile;
 using CenIT.DegreeManagement.CoreAPI.Resources;
 using CenIT.DegreeManagement.CoreAPI.Validation;
-using FirebaseAdmin.Messaging;
 using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
-using Microsoft.AspNetCore.SignalR;
 using Newtonsoft.Json;
+using NPOI.HSSF.UserModel;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
+using SharpCompress.Common;
 using System.Data;
 using static CenIT.DegreeManagement.CoreAPI.Core.Helpers.DataTableValidatorHelper;
 
@@ -43,19 +43,23 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
         private MessageCL _messageCL;
         private SysMessageConfigCL _sysMessageConfigCL;
         private SysDeviceTokenCL _sysDeviceTokenCL;
+        private SysConfigCL _sysConfigCL;
+
         private DanhMucTotNghiepCL _danhMucTotNghiepCL;
         private readonly FirebaseNotificationUtils _firebaseNotificationUtils;
         private readonly BackgroundJobManager _backgroundJobManager;
         private ILogger<HocSinhTruongController> _logger;
+        private readonly IFileService _fileService;
         private readonly ShareResource _localizer;
         private readonly IMapper _mapper;
 
-        public HocSinhTruongController(ICacheService cacheService, IConfiguration configuration, BackgroundJobManager backgroundJobManager, FirebaseNotificationUtils firebaseNotificationUtils, ShareResource shareResource, ILogger<HocSinhTruongController> logger, IMapper mapper) : base(cacheService, configuration)
+        public HocSinhTruongController(ICacheService cacheService, IConfiguration configuration, IFileService fileService, BackgroundJobManager backgroundJobManager, FirebaseNotificationUtils firebaseNotificationUtils, ShareResource shareResource, ILogger<HocSinhTruongController> logger, IMapper mapper) : base(cacheService, configuration)
         {
             _cacheLayer = new HocSinhCL(cacheService, configuration);
             _danTocCL = new DanTocCL(cacheService, configuration);
             _monThiCL = new MonThiCL(cacheService, configuration);
             _sysDeviceTokenCL = new SysDeviceTokenCL(cacheService);
+            _sysConfigCL = new SysConfigCL(cacheService);
             _truong = new TruongCL(cacheService, configuration);
             _sysMessageConfigCL = new SysMessageConfigCL(cacheService);
             _messageCL = new MessageCL(cacheService);
@@ -65,8 +69,10 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
             _localizer = shareResource;
             _mapper = mapper;
             _firebaseNotificationUtils = firebaseNotificationUtils;
-
+            _fileService = fileService;
         }
+
+        #region Function Main
 
         /// <summary>
         /// Thêm từng học sinh 
@@ -93,90 +99,89 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
                 return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.KhoaThi.ToStringValue()));
             if (response == (int)HocSinhEnum.NotMatchHtdt)
                 return ResponseHelper.NotFound("Hình thức đào tạo của trường không khớp với danh mục tốt nghiệp");
-            else 
+            else
                 return ResponseHelper.Success(_localizer.GetAddSuccessMessage(NameControllerEnum.HocSinh.ToStringValue()), model.HoTen);
         }
 
-        /// <summary>
-        /// Thêm danh sách học sinh từ excel
-        /// </summary>
-        /// <param name="models"></param>
-        /// <returns></returns>
-        [HttpPost("ImportHocSinh")]
-        public async Task<IActionResult> ImportHocSinh([FromForm] HocSinhImportModel model)
-        {
-            try
-            {
-                //Kiểm tra định dạng file excel
-                var checkFile = FileHelper.CheckValidFileExcel(model.FileExcel);
-                if (checkFile.Item1 == (int)ErrorFileEnum.InvalidFileImage)
-                {
-                    return ResponseHelper.BadRequest(checkFile.Item2);
-                }
+        ///// <summary>
+        ///// Thêm danh sách học sinh từ excel
+        ///// </summary>
+        ///// <param name="models"></param>
+        ///// <returns></returns>
+        //[HttpPost("ImportHocSinh")]
+        //public async Task<IActionResult> ImportHocSinh([FromForm] HocSinhImportModel model)
+        //{
+        //    try
+        //    {
 
-                //Đọc file excel
-                DataTable dataFromFile = ReadExcelData(model.FileExcel);
-
-                var monThis = _monThiCL.GetAllMaMonThi();
-                var danTocs = _danTocCL.GetAllTenDanToc();
+        //        string[] allowedExtensions = { ".xlsx", ".csv", ".xls" };
+        //        var checkFile = FileHelper.CheckValidFile(model.FileExcel, allowedExtensions);
+        //        if (checkFile.Item1 == (int)ErrorFileEnum.InvalidFileImage)
+        //        {
+        //            return ResponseHelper.BadRequest(checkFile.Item2);
+        //        }
 
 
-                var validationRules = HocSinhValidationRules.GetRules(monThis, danTocs);
-                // Kiểm tra dữ liệu
-                ValidationResult checkValue = ValidateDataTable(dataFromFile, validationRules);
-                if (checkValue.ErrorCode < 0)
-                {
-                    return ResponseHelper.BadRequest(checkValue.ErrorMessage);
-                }
+        //        //Đọc file excel
+        //        DataTable dataFromFile = ReadExcelData(model.FileExcel);
 
-                //Map từ datatable sang List<HocSinhImportViewModel>
-                List<HocSinhImportViewModel> hocSinhImports = ModelProvider.CreateListFromTable<HocSinhImportViewModel>(dataFromFile);
-                hocSinhImports.ForEach(hocSinh =>
-                {
-                    hocSinh.IdTruong = model.IdTruong;
-                    hocSinh.IdDanhMucTotNghiep = model.IdDanhMucTotNghiep;
-                    hocSinh.NgayTao = DateTime.Now;
-                    hocSinh.NguoiTao = model.NguoiThucHien;
-                    hocSinh.IdKhoaThi = model.IdKhoaThi;
-                    hocSinh.KetQuaHocTaps = new List<KetQuaHocTapModel>
-                    {
-                        new KetQuaHocTapModel { MaMon = hocSinh.Mon1, Diem = hocSinh.DiemMon1 ?? 0 },
-                        new KetQuaHocTapModel { MaMon = hocSinh.Mon2, Diem = hocSinh.DiemMon2 ?? 0 },
-                        new KetQuaHocTapModel { MaMon = hocSinh.Mon3, Diem = hocSinh.DiemMon3 ?? 0 },
-                        new KetQuaHocTapModel { MaMon = hocSinh.Mon4, Diem = hocSinh.DiemMon4 ?? 0 },
-                        new KetQuaHocTapModel { MaMon = hocSinh.Mon5, Diem = hocSinh.DiemMon5 ?? 0 },
-                        new KetQuaHocTapModel { MaMon = hocSinh.Mon6, Diem = hocSinh.DiemMon6 ?? 0 }
-                    };
-                });
+        //        var monThis = _monThiCL.GetAllMaMonThi();
+        //        var danTocs = _danTocCL.GetAllTenDanToc();
 
-                List<HocSinhModel> hocSinhs = _mapper.Map<List<HocSinhModel>>(hocSinhImports);
+        //        //Kiểm tra dữ liệu excel
+        //        var validationRules = HocSinhValidationRules.GetRules(monThis, danTocs);
+        //        ValidationResult checkValue = ValidateDataTable(dataFromFile, validationRules);
+        //        if (checkValue.ErrorCode < 0)
+        //        {
+        //            return ResponseHelper.BadRequest(checkValue.ErrorMessage);
+        //        }
 
-                var response = await _cacheLayer.ImportHocSinh(hocSinhs, model.IdTruong, model.IdDanhMucTotNghiep);
-                if (response.ErrorCode == (int)HocSinhEnum.Fail)
-                    return ResponseHelper.BadRequest(_localizer.GetImportErrorMessage(NameControllerEnum.HocSinh.ToStringValue()));
-                if (response.ErrorCode == (int)HocSinhEnum.ExistCccd)
-                    return ResponseHelper.BadRequest(_localizer.GetAlreadyExistMessage(HocSinhInFoEnum.CCCD.ToStringValue()), response.ErrorMessage);
-                if (response.ErrorCode == (int)HocSinhEnum.ExistSTT)
-                    return ResponseHelper.BadRequest(_localizer.GetAlreadyExistMessage(HocSinhInFoEnum.STT.ToStringValue()), response.ErrorMessage);
-                //if (response.ErrorCode == (int)HocSinhEnum.Approved)
-                //    return ResponseHelper.BadRequest(_localizer.GetApprovedMessage(NameControllerEnum.HocSinh.ToStringValue()));
-                if (response.ErrorCode == (int)HocSinhEnum.NotExistTruong)
-                    return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.Truong.ToStringValue()));
-                if (response.ErrorCode == (int)HocSinhEnum.NotExistHTDT)
-                    return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.HinhThucDaoTao.ToStringValue()));
-                if (response.ErrorCode == (int)HocSinhEnum.NotExistDanhMucTotNghiep)
-                    return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.DanhMucTotNghiep.ToStringValue()));
-                if (response.ErrorCode == (int)HocSinhEnum.NotMatchHtdt)
-                    return ResponseHelper.NotFound("Hình thức đào tạo của trường không khớp với danh mục tốt nghiệp");
-                else
-                    return ResponseHelper.Success(_localizer.GetImportSuccessMessage(NameControllerEnum.HocSinh.ToStringValue()));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex.Message, ex);
-                return ResponseHelper.Error500(ex.Message);
-            }
-        }
+        //        //Map từ datatable sang List<HocSinhImportViewModel>
+        //        List<HocSinhImportViewModel> hocSinhImports = ModelProvider.CreateListFromTable<HocSinhImportViewModel>(dataFromFile);
+        //        hocSinhImports.ForEach(hocSinh =>
+        //        {
+        //            hocSinh.IdTruong = model.IdTruong;
+        //            hocSinh.IdDanhMucTotNghiep = model.IdDanhMucTotNghiep;
+        //            hocSinh.NgayTao = DateTime.Now;
+        //            hocSinh.NguoiTao = model.NguoiThucHien;
+        //            hocSinh.IdKhoaThi = model.IdKhoaThi;
+        //            hocSinh.KetQuaHocTaps = new List<KetQuaHocTapModel>
+        //            {
+        //                new KetQuaHocTapModel { MaMon = hocSinh.MonNV, Diem = hocSinh.DiemNV ?? 0 },
+        //                new KetQuaHocTapModel { MaMon = hocSinh.MonTO, Diem = hocSinh.DiemTO ?? 0 },
+        //                new KetQuaHocTapModel { MaMon = hocSinh.Mon3, Diem = hocSinh.DiemMon3 ?? 0 },
+        //                new KetQuaHocTapModel { MaMon = hocSinh.Mon4, Diem = hocSinh.DiemMon4 ?? 0 },
+        //                new KetQuaHocTapModel { MaMon = hocSinh.Mon5, Diem = hocSinh.DiemMon5 ?? 0 },
+        //                new KetQuaHocTapModel { MaMon = hocSinh.Mon6, Diem = hocSinh.DiemMon6 ?? 0 }
+        //            };
+        //        });
+
+        //        List<HocSinhModel> hocSinhs = _mapper.Map<List<HocSinhModel>>(hocSinhImports);
+        //        //gọi hàm cache
+        //        var response = await _cacheLayer.ImportHocSinh(hocSinhs, model.IdTruong, model.IdDanhMucTotNghiep);
+        //        if (response.ErrorCode == (int)HocSinhEnum.Fail)
+        //            return ResponseHelper.BadRequest(_localizer.GetImportErrorMessage(NameControllerEnum.HocSinh.ToStringValue()));
+        //        if (response.ErrorCode == (int)HocSinhEnum.ExistCccd)
+        //            return ResponseHelper.BadRequest(_localizer.GetAlreadyExistMessage(HocSinhInFoEnum.CCCD.ToStringValue()), response.ErrorMessage);
+        //        if (response.ErrorCode == (int)HocSinhEnum.ExistSTT)
+        //            return ResponseHelper.BadRequest(_localizer.GetAlreadyExistMessage(HocSinhInFoEnum.STT.ToStringValue()), response.ErrorMessage);
+        //        if (response.ErrorCode == (int)HocSinhEnum.NotExistTruong)
+        //            return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.Truong.ToStringValue()));
+        //        if (response.ErrorCode == (int)HocSinhEnum.NotExistHTDT)
+        //            return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.HinhThucDaoTao.ToStringValue()));
+        //        if (response.ErrorCode == (int)HocSinhEnum.NotExistDanhMucTotNghiep)
+        //            return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.DanhMucTotNghiep.ToStringValue()));
+        //        if (response.ErrorCode == (int)HocSinhEnum.NotMatchHtdt)
+        //            return ResponseHelper.NotFound("Hình thức đào tạo của trường không khớp với danh mục tốt nghiệp");
+        //        else
+        //            return ResponseHelper.Success(_localizer.GetImportSuccessMessage(NameControllerEnum.HocSinh.ToStringValue()));
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError(ex.Message, ex);
+        //        return ResponseHelper.Error500(ex.Message);
+        //    }
+        //}
 
         /// <summary>
         /// Xóa tất cả học sinh chưa xác nhận theo maTruong
@@ -291,7 +296,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
         /// <returns></returns>
 
         [HttpPost("GetHocSinhDaDuyetByCCCD")]
-        public IActionResult GetHocSinhDaDuyetByCCCD(string idTruong,[FromBody] List<string> listCCCD)
+        public IActionResult GetHocSinhDaDuyetByCCCD(string idTruong, [FromBody] List<string> listCCCD)
         {
             var hocSinhs = _cacheLayer.GetHocSinhDaDuyetByCCCD(idTruong, listCCCD);
 
@@ -356,13 +361,15 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
             string controllerName = HttpContext.GetEndpoint()?.Metadata?.GetMetadata<ControllerActionDescriptor>()?.ControllerName!;
             string action = EString.GenerateActionString(controllerName, actionName);
             var messageConfig = _sysMessageConfigCL.GetByActionName(action);
-            if(messageConfig != null)
+            if (messageConfig != null)
             {
-                var jsonData = new {
+                var jsonData = new
+                {
                     IdDanhMucTotNghiep = idDanhMucTotNghiep,
                     IdTruong = idTruong,
                     MaHeDaoTao = response.MaHeDaoTao,
-                    TrangThai = (int)TrangThaiHocSinhEnum.ChoDuyet}; 
+                    TrangThai = (int)TrangThaiHocSinhEnum.ChoDuyet
+                };
                 string jsonString = JsonConvert.SerializeObject(jsonData);
 
                 MessageInputModel message = new MessageInputModel()
@@ -400,7 +407,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
         /// <param name="listCCCD"></param> 
         /// <returns></returns>
         [HttpPost("Confirm")]
-        public async Task<IActionResult> Confirm(string idTruong, string idDanhMucTotNghiep ,List<string> listCCCD)
+        public async Task<IActionResult> Confirm(string idTruong, string idDanhMucTotNghiep, List<string> listCCCD)
         {
             var response = await _cacheLayer.XacNhanHocSinh(idTruong, idDanhMucTotNghiep, listCCCD);
             if (response.MaLoi == (int)HocSinhEnum.Fail)
@@ -420,7 +427,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
             string controllerName = HttpContext.GetEndpoint()?.Metadata?.GetMetadata<ControllerActionDescriptor>()?.ControllerName!;
             string action = EString.GenerateActionString(controllerName, actionName);
             var messageConfig = _sysMessageConfigCL.GetByActionName(action);
-            if(messageConfig != null)
+            if (messageConfig != null)
             {
                 var jsonData = new
                 {
@@ -449,7 +456,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
                 var sendMessage = _messageCL.Save(message);
                 BackgroundJob.Enqueue(() => _backgroundJobManager.SendNotificationInBackground(message.Title, message.Content, deviceTokens));
             }
-          
+
             if (response.MaLoi == (int)HocSinhEnum.Success && response.DaGui == false)
             {
                 await _danhMucTotNghiepCL.CapNhatSoLuongTruongDaGui(idDanhMucTotNghiep);
@@ -458,6 +465,107 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
             else
                 return ResponseHelper.Success(_localizer.GetConfirmSuccessMessage(NameControllerEnum.HocSinh.ToStringValue()));
         }
+
+        #endregion
+
+        /// <summary>
+        /// Thêm danh sách học sinh từ excel
+        /// </summary>
+        /// <param name="models"></param>
+        /// <returns></returns>
+        [HttpPost("ImportHocSinh")]
+        [AllowAnonymous]
+        public async Task<IActionResult> ImportHocSinh([FromForm] HocSinhImportModel model)
+        {
+            try
+            {
+               
+                //Kiểm tra định dạng file excel
+                string[] allowedExtensions = { ".xlsx", ".csv", ".xls" };
+                var checkFile = FileHelper.CheckValidFile(model.FileExcel, allowedExtensions);
+                if (checkFile.Item1 == (int)ErrorFileEnum.InvalidFileImage)
+                {
+                    return ResponseHelper.BadRequest(checkFile.Item2);
+                }
+
+                //Đọc file excel
+                DataTable dataFromFile = ExcelProcess.ReadExcelData(model.FileExcel);
+
+                var monThis = _monThiCL.GetAllMaMonThi();
+                var danTocs = _danTocCL.GetAllTenDanToc();
+                var hocSinhAlls = _cacheLayer.GetAllHocSinhDaCoSoHieu();
+                string[] arrayCccd = hocSinhAlls.Select(x => x.CCCD).OrderByDescending(x => x).ToArray();
+                var config = _sysConfigCL.GetConfigByKey(CodeConfigEnum.AutomaticallyGraded.ToStringValue());
+                bool isAutoGraded = false;
+                if(config != null)
+                {
+                    isAutoGraded = config.ConfigValue == "true" ? true : false;
+                }
+                
+                //// Kiểm tra dữ liệu của file excel
+                var validationRules = HocSinhValidationRules.GetRulesHocSinhNew(monThis, danTocs, arrayCccd, isAutoGraded);
+                var checkValue = CheckValidDataTable(dataFromFile, validationRules);
+
+                if (checkValue.Item2 > 0)
+                {
+                    var result = checkValue.Item1;
+                    return ResponseHelper.BadRequest(_localizer.GetImportErrorMessage(NameControllerEnum.HocSinh.ToStringValue()));
+                }
+
+                //Map từ datatable sang List<HocSinhImportViewModel>
+                List<HocSinhImportViewModel> hocSinhImports = ModelProvider.CreateListFromTable<HocSinhImportViewModel>(dataFromFile);
+                hocSinhImports.ForEach(hocSinh =>
+                {
+                    hocSinh.IdTruong = model.IdTruong;
+                    hocSinh.IdDanhMucTotNghiep = model.IdDanhMucTotNghiep;
+                    hocSinh.NgayTao = DateTime.Now;
+                    hocSinh.NguoiTao = model.NguoiThucHien;
+                    
+                    hocSinh.IdKhoaThi = model.IdKhoaThi;
+                    var resultEvaluate = GraduationType.AutoEvaluateGraduation(hocSinh.HocLuc, hocSinh.KetQua, hocSinh.XepLoai, hocSinh.HanhKiem,
+                                                       hocSinh.DiemTB, hocSinh.DiemNV, hocSinh.DiemTO, hocSinh.DienXTN, hocSinh.LanDauTotNghiep);
+                    hocSinh.HocLuc = resultEvaluate.HocLuc;
+                    hocSinh.KetQua = resultEvaluate.KetQua;
+                    hocSinh.XepLoai = resultEvaluate.XepLoai;
+
+                    hocSinh.KetQuaHocTaps = new List<KetQuaHocTapModel>
+                    {
+                        new KetQuaHocTapModel { MaMon = hocSinh.MonNV, Diem = hocSinh.DiemNV ?? 0 },
+                        new KetQuaHocTapModel { MaMon = hocSinh.MonTO, Diem = hocSinh.DiemTO ?? 0 },
+                        new KetQuaHocTapModel { MaMon = hocSinh.Mon3, Diem = hocSinh.DiemMon3 ?? 0 },
+                        new KetQuaHocTapModel { MaMon = hocSinh.Mon4, Diem = hocSinh.DiemMon4 ?? 0 },
+                        new KetQuaHocTapModel { MaMon = hocSinh.Mon5, Diem = hocSinh.DiemMon5 ?? 0 },
+                        new KetQuaHocTapModel { MaMon = hocSinh.Mon6, Diem = hocSinh.DiemMon6 ?? 0 }
+                    };
+                });
+
+                List<HocSinhModel> hocSinhs = _mapper.Map<List<HocSinhModel>>(hocSinhImports);
+                // gọi cache
+                var response = await _cacheLayer.ImportHocSinh(hocSinhs, model.IdTruong, model.IdDanhMucTotNghiep);
+                if (response.ErrorCode == (int)HocSinhEnum.Fail)
+                    return ResponseHelper.BadRequest(_localizer.GetImportErrorMessage(NameControllerEnum.HocSinh.ToStringValue()));
+                if (response.ErrorCode == (int)HocSinhEnum.ExistCccd)
+                    return ResponseHelper.BadRequest(_localizer.GetAlreadyExistMessage(HocSinhInFoEnum.CCCD.ToStringValue()), response.ErrorMessage);
+                if (response.ErrorCode == (int)HocSinhEnum.ExistSTT)
+                    return ResponseHelper.BadRequest(_localizer.GetAlreadyExistMessage(HocSinhInFoEnum.STT.ToStringValue()), response.ErrorMessage);
+                if (response.ErrorCode == (int)HocSinhEnum.NotExistTruong)
+                    return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.Truong.ToStringValue()));
+                if (response.ErrorCode == (int)HocSinhEnum.NotExistHTDT)
+                    return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.HinhThucDaoTao.ToStringValue()));
+                if (response.ErrorCode == (int)HocSinhEnum.NotExistDanhMucTotNghiep)
+                    return ResponseHelper.NotFound(_localizer.GetNotExistMessage(NameControllerEnum.DanhMucTotNghiep.ToStringValue()));
+                if (response.ErrorCode == (int)HocSinhEnum.NotMatchHtdt)
+                    return ResponseHelper.NotFound("Hình thức đào tạo của trường không khớp với danh mục tốt nghiệp");
+                else
+                    return ResponseHelper.Success(_localizer.GetImportSuccessMessage(NameControllerEnum.HocSinh.ToStringValue()));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.Message, ex);
+                return ResponseHelper.Error500(ex.Message);
+            }
+        }
+
 
         private DataTable ReadExcelData(IFormFile file)
         {
@@ -476,10 +584,13 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
                 }
 
                 // Lặp qua các hàng trong sheet từ dòng thứ 2 (dữ liệu)
-                for (int rowIndex = 1; rowIndex <= sheet.LastRowNum; rowIndex++)
+                for (int rowIndex = 2; rowIndex <= sheet.LastRowNum; rowIndex++)
                 {
                     IRow row = sheet.GetRow(rowIndex);
-                    if (row == null) continue;
+                    //if (row == null) continue;
+
+                    if (row == null || row.ZeroHeight)
+                        continue;
 
                     // Tạo một hàng mới trong DataTable
                     DataRow dataRow = dataTable.NewRow();
@@ -498,5 +609,44 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.DuLieuHocSinh
 
             return dataTable;
         }
+
+
+        //private Tuple<int, string, MemoryStream> SaveExcelFile(DataTable dataTable, string folderName, string fileName, string sheetName)
+        //{
+        //    try
+        //    {
+        //        // Tạo một workbook mới
+        //        IWorkbook workbook = new HSSFWorkbook();
+
+        //        // Tạo một trang tính mới trong workbook
+        //        ISheet sheet = workbook.CreateSheet(sheetName);
+
+        //        // Tạo tiêu đề từ tên cột trong DataTable
+        //        IRow headerRow = sheet.CreateRow(0);
+        //        for (int i = 0; i < dataTable.Columns.Count; i++)
+        //        {
+        //            headerRow.CreateCell(i).SetCellValue(dataTable.Columns[i].ColumnName);
+        //        }
+
+        //        // Đổ dữ liệu từ DataTable vào workbook
+        //        for (int i = 0; i < dataTable.Rows.Count; i++)
+        //        {
+        //            IRow dataRow = sheet.CreateRow(i + 1);
+        //            for (int j = 0; j < dataTable.Columns.Count; j++)
+        //            {
+        //                dataRow.CreateCell(j).SetCellValue(dataTable.Rows[i][j].ToString());
+        //            }
+        //        }
+
+        //        var stream = new MemoryStream();
+        //        workbook.Write(stream);
+        //        FileStream file = new FileStream(fo, FileMode.CreateNew, FileAccess.Write);
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new Tuple<int, string, MemoryStream>(0, _localizer.GetUploadErrorMessage(), null);
+        //    }
+        //}
+
     }
 }
