@@ -175,9 +175,9 @@ namespace CenIT.DegreeManagement.CoreAPI.Caching
             return phoiGocs;
         }
 
-        public List<ThongKePhatBangModel> GetThongKePhatBang(out int total, ThongKePhatBangSearchModel modelSearch)
+        public List<ThongKePhatBangModel> GetThongKePhatBang(out int total, ThongKePhatBangSearchModel modelSearch, string idCha)
         {
-            string objectKey = EHashMd5.FromObject(modelSearch);
+            string objectKey = EHashMd5.FromObject(modelSearch) + idCha;
             string rawKey = string.Concat("GetThongKePhatBang-", objectKey);
             string rawKeyTotal = string.Concat(rawKey, "-Total");
 
@@ -189,7 +189,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Caching
             List<ThongKePhatBangModel> phoiGocs = _cache.GetCacheKey<List<ThongKePhatBangModel>>(rawKey, _masterCacheKey)!;
             if (phoiGocs != null) return phoiGocs;
             // Item not found in cache - retrieve it and insert it into the cache
-            phoiGocs = _BL.GetThongKePhatBang(out total, modelSearch);
+            phoiGocs = _BL.GetThongKePhatBang(out total, modelSearch, idCha);
             _cache.AddCacheItem(rawKey, phoiGocs, _masterCacheKey);
             _cache.AddCacheItem(rawKeyTotal, total, _masterCacheKey);
             return phoiGocs;
