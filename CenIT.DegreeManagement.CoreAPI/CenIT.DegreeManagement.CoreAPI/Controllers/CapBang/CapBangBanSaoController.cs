@@ -156,11 +156,12 @@ namespace CenIT.DegreeManagement.CoreAPI.Controllers.CapBang
         }
 
         [HttpGet("GetSearchDonYeuCauDaDuyet")]
+        [AllowAnonymous]
         public IActionResult GetSearchDonYeuCauDaDuyet([FromQuery] HocSinhCapBanSaoParamModel model)
         {
             int total;
             var user = _sysUserCL.GetByUsername(model.NguoiThucHien);
-            var donVi = _truongCL.GetById(user.TruongID);
+            var donVi = _truongCL.GetById(user .TruongID);
             var data = _donYeuCauCapBanSaoCL.GetSearchDonYeuCauDaDuyet(out total, model, donVi);
             var outputData = new
             {
