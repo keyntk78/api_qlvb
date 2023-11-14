@@ -19,7 +19,6 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness.QuanLySo
         private readonly string collectionNameDanhMucTotNghiep = "DanhMucTotNghiep";
         private readonly string collectionNameNamThi = "NamThi";
 
-
         private IMongoDatabase _mongoDatabase;
 
         public SoGocBL(IConfiguration configuration)

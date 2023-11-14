@@ -33,7 +33,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Model.Models.Output.DuLieuHocSinh
         public string GhiChu { get; set; } = string.Empty;
         public string DienXTN { get; set; } = string.Empty;
         public double DiemXTN { get; set; } = 0;
-        public double DiemTB12 { get; set; } = 0;
+        public double DiemTB { get; set; } = 0;
         public double DiemKK { get; set; } = 0;
         public string? MaDKThi { get; set; } = string.Empty;
         public string? TenDKThi { get; set; } = string.Empty;
@@ -54,6 +54,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Model.Models.Output.DuLieuHocSinh
         public string? IdPhoiBanSao { get; set; } = string.Empty;
         public string? IdSoCapBanSao { get; set; } = string.Empty;
         public string? IdSoCapPhatBang { get; set; } = string.Empty;
+        public string? LanDauTotNghiep { get; set; } = string.Empty;
         public int SoLanIn { get; set; } = 0;
         public ThongTinPhatBangModel ThongTinPhatBang { get; set; } = new ThongTinPhatBangModel();
     }
@@ -103,14 +104,15 @@ namespace CenIT.DegreeManagement.CoreAPI.Model.Models.Output.DuLieuHocSinh
     {
         public string? SoHieuVanBang { get; set; } = string.Empty;
         public string? SoVaoSoCapBang { get; set; } = string.Empty;
-        public double? DiemMon1 { get; set; } = 0;
-        public double? DiemMon2 { get; set; } = 0;
+        public string? LanDauTotNghiep { get; set; } = string.Empty;
+        public double? DiemNV { get; set; } = 0;
+        public double? DiemTO { get; set; } = 0;
         public double? DiemMon3 { get; set; } = 0;
         public double? DiemMon4 { get; set; } = 0;
         public double? DiemMon5 { get; set; } = 0;
         public double? DiemMon6 { get; set; } = 0;
-        public string? Mon1 { get; set; } = string.Empty;
-        public string? Mon2 { get; set; } = string.Empty;
+        public string? MonNV { get; set; } = string.Empty;
+        public string? MonTO { get; set; } = string.Empty;
         public string? Mon3 { get; set; } = string.Empty;
         public string? Mon4 { get; set; } = string.Empty;
         public string? Mon5 { get; set; } = string.Empty;

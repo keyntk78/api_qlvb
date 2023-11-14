@@ -38,5 +38,29 @@ namespace CenIT.DegreeManagement.CoreAPI.Core.Helpers
 
             return new Tuple<int, string>(1, "");
         }
+
+        public static Tuple<int, string> CheckValidFile(IFormFile file, string[] allowedExtensions)
+        {
+            if (file == null || file.Length == 0)
+            {
+                return new Tuple<int, string>(-1, "File không được để trống.");
+            }
+
+            string fileExtension = Path.GetExtension(file.FileName).ToLower();
+
+            if (!allowedExtensions.Contains(fileExtension))
+            {
+                return new Tuple<int, string>(-1, $"Định dạng file không hợp lệ. Vui lòng chỉ chấp nhận các định dạng sau: {string.Join(", ", allowedExtensions)}.");
+            }
+
+            const int maxSize = 10 * 1024 * 1024; // 10MB
+            if (file.Length > maxSize)
+            {
+                return new Tuple<int, string>(-1, "Kích thước file vượt quá giới hạn cho phép (10MB).");
+            }
+
+            return new Tuple<int, string>(1, "");
+        }
+
     }
 }

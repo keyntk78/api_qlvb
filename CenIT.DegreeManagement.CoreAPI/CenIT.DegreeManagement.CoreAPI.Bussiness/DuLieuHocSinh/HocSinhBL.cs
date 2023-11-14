@@ -10,6 +10,7 @@ using CenIT.DegreeManagement.CoreAPI.Model.Models.Output.DuLieuHocSinh;
 using CenIT.DegreeManagement.CoreAPI.Model.Models.Output.Phoi;
 using CenIT.DegreeManagement.CoreAPI.Model.Models.Output.SoGoc;
 using CenIT.DegreeManagement.CoreAPI.Model.Models.Output.ThongKe;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -40,6 +41,9 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness.DuLieuHocSinh
         }
 
         #region Dùng chung
+
+
+
         /// <summary>
         /// Thêm danh sách học sinh
         /// </summary>
@@ -68,24 +72,24 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness.DuLieuHocSinh
                     model.STT = ++maxSTT;
                 }
 
-                // Kiểm tra các cccd của dữ liệu trả về có bị trùng lặp với cccd trong db
-                List<HocSinhModel> hocSinhDbList = collectionHoSinh.Find(hs => true && hs.Xoa == false).ToList();
+                //// Kiểm tra các cccd của dữ liệu trả về có bị trùng lặp với cccd trong db
+                //List<HocSinhModel> hocSinhDbList = collectionHoSinh.Find(hs => true && hs.Xoa == false).ToList();
 
 
-                HashSet<string> cccdHashSet = new HashSet<string>(hocSinhDbList.Select(hs => hs.CCCD));
+                //HashSet<string> cccdHashSet = new HashSet<string>(hocSinhDbList.Select(hs => hs.CCCD));
 
-                var duplicates = models.Where(hs => cccdHashSet.Contains(hs.CCCD)).ToList();
+                //var duplicates = models.Where(hs => cccdHashSet.Contains(hs.CCCD)).ToList();
 
-                if (duplicates.Count > 0)
-                {
-                    return new ImportResultModel { ErrorCode = (int)HocSinhEnum.ExistCccd, ErrorMessage = duplicates.First().CCCD };
-                }
+                //if (duplicates.Count > 0)
+                //{
+                //    return new ImportResultModel { ErrorCode = (int)HocSinhEnum.ExistCccd, ErrorMessage = duplicates.First().CCCD };
+                //}
 
-                else
-                {
+                //else
+                //{
                     collectionHoSinh.InsertMany(models);
                     return new ImportResultModel { ErrorCode = (int)HocSinhEnum.Success };
-                }
+                //}
             }
             catch
             {

@@ -796,7 +796,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness
             var resutl = ModelProvider.ExtractDataFromMongoList<ThongKePhoiGocModel>( data, out total);
             return resutl;
         }
-        public List<ThongKePhatBangModel> GetThongKePhatBang(out int total,ThongKePhatBangSearchModel modelSearch)
+        public List<ThongKePhatBangModel> GetThongKePhatBang(out int total,ThongKePhatBangSearchModel modelSearch, string idCha)
         {
             var matchIdTruong = string.IsNullOrEmpty(modelSearch.IdTruong) ? "" : $"'_id': ObjectId('{modelSearch.IdTruong}'),";
             string order = MongoPipeline.GenerateSortPipeline(modelSearch.Order, modelSearch.OrderDir, "Ten");
@@ -810,6 +810,7 @@ namespace CenIT.DegreeManagement.CoreAPI.Bussiness
                                 $match: {{
                                   Xoa: false,
                                   MaHeDaoTao: '{modelSearch.MaHeDaoTao}',
+                                  IdCha: '{idCha}',
                                    {matchIdTruong}
                                 }},
                               }},

@@ -11,5 +11,6 @@ namespace CenIT.DegreeManagement.CoreAPI.Model.Models.Input.Search
     {
         public string IdNamThi { get; set; } = null!;
         public string? MaHeDaoTao { get; set; }
+        public string NguoiThucHien { get; set; }
     }
 }
